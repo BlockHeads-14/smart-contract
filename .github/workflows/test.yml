@@ -3,7 +3,7 @@ name: Solidity Tests
 on:
   push:
     branches:
-      - main # Adjust to match your main branch name
+      - dev
 
 jobs:
   build:
