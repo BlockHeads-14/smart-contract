@@ -35,6 +35,17 @@ describe("BridgingBlock Contract", function () {
     expect(institutionData.isRegistered).to.equal(true);
   });
 
+  it("should not allow a non-owner to register an institution", async function () {
+    // Attempt to register an institution by a non-owner
+    try {
+      await bridgingBlock
+        .connect(institution)
+        .registerInstitution(owner.address, "Institution 2");
+    } catch (error) {
+      expect(error.message).to.contain("revert");
+    }
+  });
+
   it("Should not allow duplicate institution registration", async function () {
     await bridgingBlock
       .connect(owner)
