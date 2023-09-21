@@ -5,6 +5,10 @@ on:
     branches:
       - dev
 
+defaults:
+  run:
+    working-directory: ./bridging-block
+
 jobs:
   build:
     runs-on: ubuntu-latest
