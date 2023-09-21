@@ -21,5 +21,8 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Compile the contract
+        run: npx hardhat compile
+
       - name: Run tests
         run: npx hardhat test
