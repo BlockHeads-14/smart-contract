@@ -3,3 +3,5 @@
 # Hardhat-specific files and directories
 */cache/
 */artifacts/
+testOld.js
+.vscode/settings.json

@@ -1,4 +1,9 @@
+// npx hardhat run scripts/deploy.js --network sepolia
+
+const { ethers, upgrades } = require("hardhat");
+
 async function main() {
+  // Get the accounts/signers
   const [deployer] = await ethers.getSigners();
   console.log("Deploying contracts with the account:", deployer.address);
   //   console.log("Account balance:", (await deployer.getBalance()).toString());
