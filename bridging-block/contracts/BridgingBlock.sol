@@ -2,7 +2,7 @@
 pragma solidity ^0.8.18;
 
 contract BridgingBlock {
-    address public contractOwner;
+    address private contractOwner;
     
     struct Institution {
         string name;
@@ -25,6 +25,7 @@ contract BridgingBlock {
 
     event InstitutionRegistered(address indexed institutionAddress, string name);
     event CredentialGenerated(address indexed studentAddress, bytes32 studentName);
+    event InstitutionUnregistered(address indexed institutionAddress);
 
     modifier onlyContractOwner() {
         require(msg.sender == contractOwner, "Only the contract owner can perform this action");
@@ -75,9 +76,10 @@ contract BridgingBlock {
         emit CredentialGenerated(studentAddress, studentName);
     }
     
-    // Unregister an institution (onlyContractOwner or a different logic for who can do this)
+    // Unregister an institution
     function unregisterInstitution(address institutionAddress) public onlyContractOwner {
         require(institutions[institutionAddress].isRegistered, "Institution is not registered");
         delete institutions[institutionAddress];
+        emit InstitutionUnregistered(institutionAddress);
     }
 }
