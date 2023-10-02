@@ -26,6 +26,7 @@ contract BridgingBlock {
     event InstitutionRegistered(address indexed institutionAddress, string name);
     event CredentialGenerated(address indexed studentAddress, bytes32 studentName);
     event InstitutionUnregistered(address indexed institutionAddress);
+    event CredentialDeleted(address indexed studentAddress);
 
     modifier onlyContractOwner() {
         require(msg.sender == contractOwner, "Only the contract owner can perform this action");
@@ -33,7 +34,7 @@ contract BridgingBlock {
     }
     
     modifier onlyRegisteredInstitution() {
-        require(institutions[msg.sender].isRegistered, "Only registered universities can generate credentials");
+        require(institutions[msg.sender].isRegistered, "Only registered universities can perform this action");
         _;
     }
     
@@ -81,5 +82,12 @@ contract BridgingBlock {
         require(institutions[institutionAddress].isRegistered, "Institution is not registered");
         delete institutions[institutionAddress];
         emit InstitutionUnregistered(institutionAddress);
+    }
+
+    // Delete student credential by institution
+    function deleteCredential(address studentAddress) public onlyRegisteredInstitution {
+        require(studentCredentials[studentAddress].studentName != 0, "Credential does not exist for this student");
+        delete studentCredentials[studentAddress];
+        emit CredentialDeleted(studentAddress);
     }
 }
