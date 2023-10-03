@@ -188,3 +188,50 @@ describe("BridgingBlock Contract", function () {
     }
   });
 });
+
+it("Should delete a student credential", async function () {
+  const studentName = "Alice";
+  const studentID = "12345";
+  const degreeName = "Computer Science";
+  const major = "Blockchain";
+  const graduationDate = 2023;
+  const GPA = "3.8";
+  const transcript = "Hash of the transcript";
+  const issuerSignature = "Hash of the issuer signature";
+
+  await bridgingBlock
+    .connect(owner)
+    .registerInstitution(institution.address, "Institution 1");
+  await bridgingBlock
+    .connect(institution)
+    .generateCredential(
+      student.address,
+      ethers.utils.formatBytes32String(studentName),
+      ethers.utils.formatBytes32String(studentID),
+      ethers.utils.formatBytes32String(degreeName),
+      ethers.utils.formatBytes32String(major),
+      graduationDate,
+      ethers.utils.formatBytes32String(GPA),
+      ethers.utils.formatBytes32String(transcript),
+      ethers.utils.formatBytes32String(issuerSignature)
+    );
+
+  // Ensure the credential exists before deletion
+  const initialCredentialData = await bridgingBlock.studentCredentials(
+    student.address
+  );
+  expect(initialCredentialData.studentName).to.equal(
+    ethers.utils.formatBytes32String(studentName)
+  );
+
+  // Delete the student credential
+  await bridgingBlock.connect(institution).deleteCredential(student.address);
+
+  // Check if the credential is deleted
+  const updatedCredentialData = await bridgingBlock.studentCredentials(
+    student.address
+  );
+  expect(updatedCredentialData.studentName).to.equal(
+    ethers.utils.formatBytes32String("")
+  );
+});
