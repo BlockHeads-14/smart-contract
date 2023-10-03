@@ -3,12 +3,7 @@ pragma solidity ^0.8.18;
 
 contract BridgingBlock {
     address public contractOwner;
-    
-    struct Institution {
-        string name;
-        bool isRegistered;
-    }
-    
+
     struct Credential {
         bytes32 studentName;
         bytes32 studentID;
@@ -19,9 +14,16 @@ contract BridgingBlock {
         bytes32 transcript;
         bytes32 issuerSignature;
     }
-    
-    mapping(address => Institution) public institutions;
+
+    struct Institution {
+        string name;
+        bool isRegistered;
+    }
+
     mapping(address => Credential) public studentCredentials;
+    mapping(address => Institution) public institutions;
+
+    address[] public institutionAddresses; // Store registered institution addresses
 
     event InstitutionRegistered(address indexed institutionAddress, string name);
     event CredentialGenerated(address indexed studentAddress, bytes32 studentName);
@@ -32,12 +34,12 @@ contract BridgingBlock {
         require(msg.sender == contractOwner, "Only the contract owner can perform this action");
         _;
     }
-    
+
     modifier onlyRegisteredInstitution() {
         require(institutions[msg.sender].isRegistered, "Only registered universities can perform this action");
         _;
     }
-    
+
     // Constructor to set the contract owner
     constructor() {
         contractOwner = msg.sender;
@@ -46,6 +48,7 @@ contract BridgingBlock {
     function registerInstitution(address institutionAddress, string memory institutionName) public onlyContractOwner {
         require(!institutions[institutionAddress].isRegistered, "Institution is already registered");
         institutions[institutionAddress] = Institution(institutionName, true);
+        institutionAddresses.push(institutionAddress);
         emit InstitutionRegistered(institutionAddress, institutionName);
     }
 
@@ -76,15 +79,14 @@ contract BridgingBlock {
         studentCredentials[studentAddress] = newCredential;
         emit CredentialGenerated(studentAddress, studentName);
     }
-    
-    // Unregister an institution
+
     function unregisterInstitution(address institutionAddress) public onlyContractOwner {
         require(institutions[institutionAddress].isRegistered, "Institution is not registered");
         delete institutions[institutionAddress];
         emit InstitutionUnregistered(institutionAddress);
+        removeInstitutionAddress(institutionAddress);
     }
 
-    // Delete student credential by institution
     function deleteCredential(address studentAddress) public onlyRegisteredInstitution {
         require(studentCredentials[studentAddress].studentName != 0, "Credential does not exist for this student");
         delete studentCredentials[studentAddress];
@@ -124,6 +126,35 @@ contract BridgingBlock {
         credential.transcript,
         credential.issuerSignature
     );
-}
+    }
+    // Function to retrieve names of all registered institutions
+    function getAllRegisteredInstitutionNames() public view returns (string[] memory) {
+        uint256 totalInstitutions = institutionAddresses.length;
+        string[] memory institutionNames = new string[](totalInstitutions);
 
+        for (uint256 i = 0; i < totalInstitutions; i++) {
+            address institutionAddress = institutionAddresses[i];
+            institutionNames[i] = institutions[institutionAddress].name;
+        }
+
+        return institutionNames;
+    }
+
+    // Internal function to remove an institution address from the list
+    function removeInstitutionAddress(address institutionAddress) internal {
+        uint256 indexToRemove = 0;
+        for (uint256 i = 0; i < institutionAddresses.length; i++) {
+            if (institutionAddresses[i] == institutionAddress) {
+                indexToRemove = i;
+                break;
+            }
+        }
+
+        if (indexToRemove < institutionAddresses.length) {
+            for (uint256 i = indexToRemove; i < institutionAddresses.length - 1; i++) {
+                institutionAddresses[i] = institutionAddresses[i + 1];
+            }
+            institutionAddresses.pop();
+        }
+    }
 }
