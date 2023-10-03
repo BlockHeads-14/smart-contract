@@ -140,21 +140,16 @@ contract BridgingBlock {
         return institutionNames;
     }
 
-    // Internal function to remove an institution address from the list
+    // Internal function to remove an institution address from the list of registered institutions
     function removeInstitutionAddress(address institutionAddress) internal {
-        uint256 indexToRemove = 0;
-        for (uint256 i = 0; i < institutionAddresses.length; i++) {
+        uint256 totalInstitutions = institutionAddresses.length;
+
+        for (uint256 i = 0; i < totalInstitutions; i++) {
             if (institutionAddresses[i] == institutionAddress) {
-                indexToRemove = i;
+                institutionAddresses[i] = institutionAddresses[totalInstitutions - 1];
+                institutionAddresses.pop();
                 break;
             }
-        }
-
-        if (indexToRemove < institutionAddresses.length) {
-            for (uint256 i = indexToRemove; i < institutionAddresses.length - 1; i++) {
-                institutionAddresses[i] = institutionAddresses[i + 1];
-            }
-            institutionAddresses.pop();
         }
     }
 }
