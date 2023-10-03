@@ -315,4 +315,42 @@ describe("BridgingBlock Contract", function () {
     expect(retrievedName).to.equal(institutionName);
     expect(retrievedIsRegistered).to.equal(true); // Assuming it's registered
   });
+
+  it("Should retrieve names of all registered institutions", async function () {
+    const institutionName1 = "Institution 1";
+    const institutionName2 = "Institution 2";
+
+    await bridgingBlock
+      .connect(owner)
+      .registerInstitution(institution.address, institutionName1);
+    await bridgingBlock
+      .connect(owner)
+      .registerInstitution(student.address, institutionName2);
+
+    const institutionNames =
+      await bridgingBlock.getAllRegisteredInstitutionNames();
+
+    expect(institutionNames).to.have.lengthOf(2);
+    expect(institutionNames[0]).to.equal(institutionName1);
+    expect(institutionNames[1]).to.equal(institutionName2);
+  });
+
+  it("Should remove an institution address from the list", async function () {
+    const institutionName = "Institution 1";
+
+    await bridgingBlock
+      .connect(owner)
+      .registerInstitution(institution.address, institutionName);
+    const initialInstitutionCount = (await bridgingBlock.institutionAddresses())
+      .length;
+
+    await bridgingBlock
+      .connect(owner)
+      .unregisterInstitution(institution.address);
+    const updatedInstitutionCount = (await bridgingBlock.institutionAddresses())
+      .length;
+
+    expect(initialInstitutionCount).to.equal(1);
+    expect(updatedInstitutionCount).to.equal(0);
+  });
 });
