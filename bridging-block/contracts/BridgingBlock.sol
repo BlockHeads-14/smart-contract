@@ -152,4 +152,19 @@ contract BridgingBlock {
             }
         }
     }
+
+    // Function to check if an institution is registered
+    function isInstitutionRegistered(address institutionAddress) public view returns (bool) {
+        return institutions[institutionAddress].isRegistered;
+    }   
+    
+    // Function to check if a credential is generated for a student
+    function isCredentialGenerated(address studentAddress) public view returns (bool) {
+        return studentCredentials[studentAddress].studentName != 0;
+    }
+    
+    // Function to get the total number of registered institutions
+    function getTotalRegisteredInstitutions() public view returns (uint256) {
+        return institutionAddresses.length;
+    }
 }
