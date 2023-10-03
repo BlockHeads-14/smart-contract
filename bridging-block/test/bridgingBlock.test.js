@@ -4,11 +4,14 @@ const { ethers } = require("hardhat");
 describe("BridgingBlock Contract", function () {
   let owner;
   let institution;
+  let institution2;
   let student;
   let bridgingBlock;
+  let institutionAddresses;
 
   beforeEach(async function () {
-    [owner, institution, student] = await ethers.getSigners();
+    [owner, institution, institution2, student, institutionAddresses] =
+      await ethers.getSigners();
 
     const BridgingBlock = await ethers.getContractFactory("BridgingBlock");
     bridgingBlock = await BridgingBlock.deploy();
@@ -186,5 +189,174 @@ describe("BridgingBlock Contract", function () {
     } catch (error) {
       expect(error.message).to.contain("revert");
     }
+  });
+
+  it("Should delete a student credential", async function () {
+    const studentName = "Alice";
+    const studentID = "12345";
+    const degreeName = "Computer Science";
+    const major = "Blockchain";
+    const graduationDate = 2023;
+    const GPA = "3.8";
+    const transcript = "Hash of the transcript";
+    const issuerSignature = "Hash of the issuer signature";
+
+    await bridgingBlock
+      .connect(owner)
+      .registerInstitution(institution.address, "Institution 1");
+    await bridgingBlock
+      .connect(institution)
+      .generateCredential(
+        student.address,
+        ethers.utils.formatBytes32String(studentName),
+        ethers.utils.formatBytes32String(studentID),
+        ethers.utils.formatBytes32String(degreeName),
+        ethers.utils.formatBytes32String(major),
+        graduationDate,
+        ethers.utils.formatBytes32String(GPA),
+        ethers.utils.formatBytes32String(transcript),
+        ethers.utils.formatBytes32String(issuerSignature)
+      );
+
+    // Ensure the credential exists before deletion
+    const initialCredentialData = await bridgingBlock.studentCredentials(
+      student.address
+    );
+    expect(initialCredentialData.studentName).to.equal(
+      ethers.utils.formatBytes32String(studentName)
+    );
+
+    // Delete the student credential
+    await bridgingBlock.connect(institution).deleteCredential(student.address);
+
+    // Check if the credential is deleted
+    const updatedCredentialData = await bridgingBlock.studentCredentials(
+      student.address
+    );
+    expect(updatedCredentialData.studentName).to.equal(
+      ethers.utils.formatBytes32String("")
+    );
+  });
+
+  it("Should not allow a non-institution to delete a student credential", async function () {
+    // Attempt to delete a student credential by a non-institution
+    try {
+      await bridgingBlock.connect(owner).deleteCredential(student.address);
+    } catch (error) {
+      expect(error.message).to.contain("revert");
+    }
+  });
+
+  it("Should retrieve a student credential", async function () {
+    const studentName = "Alice";
+    const studentID = "12345";
+    const degreeName = "Computer Science";
+    const major = "Blockchain";
+    const graduationDate = 2023;
+    const GPA = "3.8";
+    const transcript = "Hash of the transcript";
+    const issuerSignature = "Hash of the issuer signature";
+
+    await bridgingBlock
+      .connect(owner)
+      .registerInstitution(institution.address, "Institution 1");
+    await bridgingBlock
+      .connect(institution)
+      .generateCredential(
+        student.address,
+        ethers.utils.formatBytes32String(studentName),
+        ethers.utils.formatBytes32String(studentID),
+        ethers.utils.formatBytes32String(degreeName),
+        ethers.utils.formatBytes32String(major),
+        graduationDate,
+        ethers.utils.formatBytes32String(GPA),
+        ethers.utils.formatBytes32String(transcript),
+        ethers.utils.formatBytes32String(issuerSignature)
+      );
+
+    const [
+      retrievedStudentName,
+      retrievedStudentID,
+      retrievedDegreeName,
+      retrievedMajor,
+      retrievedGraduationDate,
+      retrievedGPA,
+      retrievedTranscript,
+      retrievedIssuerSignature,
+    ] = await bridgingBlock.getCredential(student.address);
+
+    expect(retrievedStudentName).to.equal(
+      ethers.utils.formatBytes32String(studentName)
+    );
+    expect(retrievedStudentID).to.equal(
+      ethers.utils.formatBytes32String(studentID)
+    );
+    expect(retrievedDegreeName).to.equal(
+      ethers.utils.formatBytes32String(degreeName)
+    );
+    expect(retrievedMajor).to.equal(ethers.utils.formatBytes32String(major));
+    expect(retrievedGraduationDate).to.equal(graduationDate);
+    expect(retrievedGPA).to.equal(ethers.utils.formatBytes32String(GPA));
+    expect(retrievedTranscript).to.equal(
+      ethers.utils.formatBytes32String(transcript)
+    );
+    expect(retrievedIssuerSignature).to.equal(
+      ethers.utils.formatBytes32String(issuerSignature)
+    );
+  });
+
+  it("Should retrieve institution details", async function () {
+    const institutionName = "Institution 1";
+
+    await bridgingBlock
+      .connect(owner)
+      .registerInstitution(institution.address, institutionName);
+
+    const [retrievedName, retrievedIsRegistered] =
+      await bridgingBlock.getInstitution(institution.address);
+
+    expect(retrievedName).to.equal(institutionName);
+    expect(retrievedIsRegistered).to.equal(true); // Assuming it's registered
+  });
+
+  it("Should retrieve names of all registered institutions", async function () {
+    const institutionName1 = "Institution 1";
+    const institutionName2 = "Institution 2";
+
+    await bridgingBlock
+      .connect(owner)
+      .registerInstitution(institution.address, institutionName1);
+    await bridgingBlock
+      .connect(owner)
+      .registerInstitution(institution2.address, institutionName2);
+
+    const institutionNames =
+      await bridgingBlock.getAllRegisteredInstitutionNames();
+
+    expect(institutionNames).to.have.lengthOf(2);
+    expect(institutionNames[0]).to.equal(institutionName1);
+    expect(institutionNames[1]).to.equal(institutionName2);
+  });
+
+  it("Should remove an institution from the list of registered institutions", async function () {
+    const institutionName1 = "Institution 1";
+    const institutionName2 = "Institution 2";
+
+    await bridgingBlock
+      .connect(owner)
+      .registerInstitution(institution.address, institutionName1);
+    await bridgingBlock
+      .connect(owner)
+      .registerInstitution(institution2.address, institutionName2);
+
+    await bridgingBlock
+      .connect(owner)
+      .unregisterInstitution(institution.address);
+
+    const institutionNames =
+      await bridgingBlock.getAllRegisteredInstitutionNames();
+
+    expect(institutionNames).to.have.lengthOf(1);
+    expect(institutionNames[0]).to.equal(institutionName2);
   });
 });
