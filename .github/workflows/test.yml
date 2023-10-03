@@ -2,9 +2,6 @@ name: Solidity Tests
 
 on:
   push:
-    branches:
-      - dev
-
 defaults:
   run:
     working-directory: ./bridging-block
