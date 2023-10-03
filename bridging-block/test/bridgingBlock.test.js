@@ -4,11 +4,14 @@ const { ethers } = require("hardhat");
 describe("BridgingBlock Contract", function () {
   let owner;
   let institution;
+  let institution2;
   let student;
   let bridgingBlock;
+  let institutionAddresses;
 
   beforeEach(async function () {
-    [owner, institution, student] = await ethers.getSigners();
+    [owner, institution, institution2, student, institutionAddresses] =
+      await ethers.getSigners();
 
     const BridgingBlock = await ethers.getContractFactory("BridgingBlock");
     bridgingBlock = await BridgingBlock.deploy();
@@ -325,7 +328,7 @@ describe("BridgingBlock Contract", function () {
       .registerInstitution(institution.address, institutionName1);
     await bridgingBlock
       .connect(owner)
-      .registerInstitution(student.address, institutionName2);
+      .registerInstitution(institution2.address, institutionName2);
 
     const institutionNames =
       await bridgingBlock.getAllRegisteredInstitutionNames();
@@ -335,22 +338,25 @@ describe("BridgingBlock Contract", function () {
     expect(institutionNames[1]).to.equal(institutionName2);
   });
 
-  it("Should remove an institution address from the list", async function () {
-    const institutionName = "Institution 1";
+  it("Should remove an institution from the list of registered institutions", async function () {
+    const institutionName1 = "Institution 1";
+    const institutionName2 = "Institution 2";
 
     await bridgingBlock
       .connect(owner)
-      .registerInstitution(institution.address, institutionName);
-    const initialInstitutionCount = (await bridgingBlock.institutionAddresses())
-      .length;
+      .registerInstitution(institution.address, institutionName1);
+    await bridgingBlock
+      .connect(owner)
+      .registerInstitution(institution2.address, institutionName2);
 
     await bridgingBlock
       .connect(owner)
       .unregisterInstitution(institution.address);
-    const updatedInstitutionCount = (await bridgingBlock.institutionAddresses())
-      .length;
 
-    expect(initialInstitutionCount).to.equal(1);
-    expect(updatedInstitutionCount).to.equal(0);
+    const institutionNames =
+      await bridgingBlock.getAllRegisteredInstitutionNames();
+
+    expect(institutionNames).to.have.lengthOf(1);
+    expect(institutionNames[0]).to.equal(institutionName2);
   });
 });
