@@ -90,4 +90,40 @@ contract BridgingBlock {
         delete studentCredentials[studentAddress];
         emit CredentialDeleted(studentAddress);
     }
+
+    // Get institution details
+    function getInstitution(address institutionAddress) public view returns (
+        string memory name,
+        bool isRegistered
+    ) {
+        Institution storage institution = institutions[institutionAddress];
+        return (
+            institution.name,
+            institution.isRegistered
+        );
+    }
+    //Get student credential details
+    function getCredential(address studentAddress) public view returns (
+    bytes32 studentName,
+    bytes32 studentID,
+    bytes32 degreeName,
+    bytes32 major,
+    uint256 graduationDate,
+    bytes32 GPA,
+    bytes32 transcript,
+    bytes32 issuerSignature
+) {
+    Credential storage credential = studentCredentials[studentAddress];
+    return (
+        credential.studentName,
+        credential.studentID,
+        credential.degreeName,
+        credential.major,
+        credential.graduationDate,
+        credential.GPA,
+        credential.transcript,
+        credential.issuerSignature
+    );
+}
+
 }
