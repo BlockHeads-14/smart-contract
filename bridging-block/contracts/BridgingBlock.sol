@@ -2,7 +2,7 @@
 pragma solidity ^0.8.18;
 
 contract BridgingBlock {
-    address private contractOwner;
+    address public contractOwner;
     
     struct Institution {
         string name;
