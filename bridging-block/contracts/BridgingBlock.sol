@@ -5,14 +5,13 @@ contract BridgingBlock {
     address public contractOwner;
 
     struct Credential {
-        bytes32 studentName;
-        bytes32 studentID;
-        bytes32 degreeName;
-        bytes32 major;
+        string studentName;
+        uint256 studentID;
+        string degreeName;
+        string major;
         uint256 graduationDate;
-        bytes32 GPA;
-        bytes32 transcript;
-        bytes32 issuerSignature;
+        uint256 gpa;
+        address issuerAddress;
     }
 
     struct Institution {
@@ -20,10 +19,17 @@ contract BridgingBlock {
         bool isRegistered;
     }
 
+    struct requestIssue {
+        string institutionName;
+        address institutionAddress;
+    }
+
+    mapping(address => requestIssue) public requestIssueMap;
     mapping(address => Credential) public studentCredentials;
     mapping(address => Institution) public institutions;
 
     address[] public institutionAddresses; // Store registered institution addresses
+    address[] public studentAddresses; // Store registered student addresses
 
     event InstitutionRegistered(
         address indexed institutionAddress,
@@ -31,7 +37,7 @@ contract BridgingBlock {
     );
     event CredentialGenerated(
         address indexed studentAddress,
-        bytes32 studentName
+        string studentName
     );
     event InstitutionUnregistered(address indexed institutionAddress);
     event CredentialDeleted(address indexed studentAddress);
@@ -57,32 +63,54 @@ contract BridgingBlock {
         contractOwner = msg.sender;
     }
 
-    function registerInstitution(
-        address institutionAddress,
-        string memory institutionName
+    function createRequestIssue(string memory institutionName) public {
+        require(
+            !institutions[msg.sender].isRegistered,
+            "Institution is already registered"
+        );
+        requestIssueMap[msg.sender] = requestIssue(institutionName, msg.sender);
+    }
+
+    function approveRequestIssue(
+        address institutionAddress
     ) public onlyContractOwner {
         require(
             !institutions[institutionAddress].isRegistered,
             "Institution is already registered"
         );
-        institutions[institutionAddress] = Institution(institutionName, true);
+        institutions[institutionAddress] = Institution(
+            requestIssueMap[institutionAddress].institutionName,
+            true
+        );
         institutionAddresses.push(institutionAddress);
-        emit InstitutionRegistered(institutionAddress, institutionName);
+        delete requestIssueMap[institutionAddress];
+        emit InstitutionRegistered(
+            institutionAddress,
+            requestIssueMap[institutionAddress].institutionName
+        );
+    }
+
+    function rejectRequestIssue(
+        address institutionAddress
+    ) public onlyContractOwner {
+        require(
+            !institutions[institutionAddress].isRegistered,
+            "Institution is already registered"
+        );
+        delete requestIssueMap[institutionAddress];
     }
 
     function generateCredential(
         address studentAddress,
-        bytes32 studentName,
-        bytes32 studentID,
-        bytes32 degreeName,
-        bytes32 major,
+        string memory studentName,
+        uint256 studentID,
+        string memory degreeName,
+        string memory major,
         uint256 graduationDate,
-        bytes32 GPA,
-        bytes32 transcript,
-        bytes32 issuerSignature
+        uint256 gpa
     ) public onlyRegisteredInstitution {
         require(
-            studentCredentials[studentAddress].studentName == 0,
+            bytes(studentCredentials[studentAddress].studentName).length == 0,
             "Credential already generated for this student"
         );
 
@@ -92,12 +120,12 @@ contract BridgingBlock {
             degreeName: degreeName,
             major: major,
             graduationDate: graduationDate,
-            GPA: GPA,
-            transcript: transcript,
-            issuerSignature: issuerSignature
+            gpa: gpa,
+            issuerAddress: msg.sender
         });
 
         studentCredentials[studentAddress] = newCredential;
+        studentAddresses.push(studentAddress);
         emit CredentialGenerated(studentAddress, studentName);
     }
 
@@ -117,10 +145,20 @@ contract BridgingBlock {
         address studentAddress
     ) public onlyRegisteredInstitution {
         require(
-            studentCredentials[studentAddress].studentName != 0,
+            bytes(studentCredentials[studentAddress].studentName).length > 0,
             "Credential does not exist for this student"
         );
         delete studentCredentials[studentAddress];
+        // delete student address form studentAddresses array
+        uint256 totalStudents = studentAddresses.length;
+
+        for (uint256 i = 0; i < totalStudents; i++) {
+            if (studentAddresses[i] == studentAddress) {
+                studentAddresses[i] = studentAddresses[totalStudents - 1];
+                studentAddresses.pop();
+                break;
+            }
+        }
         emit CredentialDeleted(studentAddress);
     }
 
@@ -139,14 +177,13 @@ contract BridgingBlock {
         public
         view
         returns (
-            bytes32 studentName,
-            bytes32 studentID,
-            bytes32 degreeName,
-            bytes32 major,
-            uint256 graduationDate,
-            bytes32 GPA,
-            bytes32 transcript,
-            bytes32 issuerSignature
+            string memory,
+            uint256,
+            string memory,
+            string memory,
+            uint256,
+            uint256,
+            address
         )
     {
         Credential storage credential = studentCredentials[studentAddress];
@@ -156,9 +193,8 @@ contract BridgingBlock {
             credential.degreeName,
             credential.major,
             credential.graduationDate,
-            credential.GPA,
-            credential.transcript,
-            credential.issuerSignature
+            credential.gpa,
+            credential.issuerAddress
         );
     }
 
@@ -205,7 +241,7 @@ contract BridgingBlock {
     function isCredentialGenerated(
         address studentAddress
     ) public view returns (bool) {
-        return studentCredentials[studentAddress].studentName != 0;
+        return bytes(studentCredentials[studentAddress].studentName).length > 0;
     }
 
     // Function to get the total number of registered institutions
@@ -214,86 +250,76 @@ contract BridgingBlock {
     }
 
     function getCredentialByStudentNameAndID(
-        bytes32 studentName,
-        bytes32 studentID
+        string memory studentName,
+        uint256 studentID
     )
         public
         view
         returns (
-            bytes32,
-            bytes32,
-            bytes32,
-            bytes32,
+            string memory,
             uint256,
-            bytes32,
-            bytes32,
-            bytes32
+            string memory,
+            string memory,
+            uint256,
+            uint256,
+            address
         )
     {
         address studentAddress = findStudentByStudentNameAndID(
             studentName,
             studentID
         );
-        require(studentAddress != address(0), "Student not found");
-
-        Credential storage credential = studentCredentials[studentAddress];
-        return (
-            credential.studentName,
-            credential.studentID,
-            credential.degreeName,
-            credential.major,
-            credential.graduationDate,
-            credential.GPA,
-            credential.transcript,
-            credential.issuerSignature
-        );
+        return getCredential(studentAddress);
     }
 
     function findStudentByStudentNameAndID(
-        bytes32 studentName,
-        bytes32 studentID
-    ) internal view returns (address) {
-        uint256 totalInstitutions = institutionAddresses.length;
-
-        for (uint256 i = 0; i < totalInstitutions; i++) {
-            address institutionAddress = institutionAddresses[i];
+        string memory studentName,
+        uint256 studentID
+    ) public view returns (address) {
+        uint256 studentCount = studentAddresses.length;
+        for (uint256 i = 0; i < studentCount; i++) {
+            address studentAddress = studentAddresses[i];
+            Credential storage credential = studentCredentials[studentAddress];
             if (
-                compareStrings(
-                    institutions[institutionAddress].name,
-                    bytes32ToString(studentName)
-                )
+                keccak256(abi.encodePacked(credential.studentName)) ==
+                keccak256(abi.encodePacked(studentName)) &&
+                credential.studentID == studentID
             ) {
-                address studentAddress = institutionAddress; // Initialize with institution address
-                if (studentCredentials[studentAddress].studentID == studentID) {
-                    return studentAddress; // Return the student address if both name and ID match
-                }
+                return studentAddress;
             }
         }
-
-        return address(0); // Return 0x0 if no matching student is found
-    }
-
-    function bytes32ToString(
-        bytes32 data
-    ) internal pure returns (string memory) {
-        bytes memory bytesData = new bytes(32);
-        for (uint256 i = 0; i < 32; i++) {
-            bytesData[i] = data[i];
-        }
-        return string(bytesData);
-    }
-
-    function compareStrings(
-        string memory a,
-        string memory b
-    ) internal pure returns (bool) {
-        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
+        return address(0);
     }
 
     // Function to check if a student is registered
     function isStudentRegistered(
         address studentAddress
     ) public view returns (bool) {
-        return studentCredentials[studentAddress].studentName != 0;
+        return bytes(studentCredentials[studentAddress].studentName).length > 0;
+    }
+
+    //Function to get institution address by name
+    function getInstitutionAddressByName(
+        string memory name
+    ) public view returns (address) {
+        uint256 totalInstitutions = institutionAddresses.length;
+
+        for (uint256 i = 0; i < totalInstitutions; i++) {
+            address institutionAddress = institutionAddresses[i];
+            if (
+                keccak256(
+                    abi.encodePacked(institutions[institutionAddress].name)
+                ) == keccak256(abi.encodePacked(name))
+            ) {
+                return institutionAddress;
+            }
+        }
+
+        return address(0);
+    }
+
+    // Function to get the total number of registered students
+    function getTotalRegisteredStudents() public view returns (uint256) {
+        return studentAddresses.length;
     }
 }
