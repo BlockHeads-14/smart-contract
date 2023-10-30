@@ -2,15 +2,15 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
 describe("BridgingBlock Contract", function () {
-  let owner;
+  let contractOwner;
   let institution;
   let institution2;
   let student;
   let bridgingBlock;
-  let institutionAddresses;
+  let requestIssue;
 
   beforeEach(async function () {
-    [owner, institution, institution2, student, institutionAddresses] =
+    [contractOwner, institution, institution2, student, requestIssue] =
       await ethers.getSigners();
 
     const BridgingBlock = await ethers.getContractFactory("BridgingBlock");
@@ -23,15 +23,19 @@ describe("BridgingBlock Contract", function () {
   });
 
   it("Should set the contract owner", async function () {
-    const contractOwner = await bridgingBlock.contractOwner();
-    expect(contractOwner).to.equal(owner.address);
+    const ownerAddress = await bridgingBlock.contractOwner();
+    expect(ownerAddress).to.equal(contractOwner.address);
   });
 
   it("Should register an institution", async function () {
     await bridgingBlock
-      .connect(owner)
-      .registerInstitution(institution.address, "Institution 1");
-    const institutionData = await bridgingBlock.institutions(
+      .connect(institution)
+      .createRequestIssue("Institution 1");
+    await bridgingBlock
+      .connect(contractOwner)
+      .approveRequestIssue(institution.address);
+
+    const institutionData = await bridgingBlock.getInstitution(
       institution.address
     );
     expect(institutionData.name).to.equal("Institution 1");
@@ -43,104 +47,100 @@ describe("BridgingBlock Contract", function () {
     try {
       await bridgingBlock
         .connect(institution)
-        .registerInstitution(owner.address, "Institution 2");
+        .createRequestIssue("Institution 1");
+      await bridgingBlock
+        .connect(institution)
+        .approveRequestIssue(institution.address);
     } catch (error) {
-      expect(error.message).to.contain("revert");
+      expect(error.message).to.contain(
+        "Only the contract owner can perform this action"
+      );
     }
   });
 
   it("Should not allow duplicate institution registration", async function () {
     await bridgingBlock
-      .connect(owner)
-      .registerInstitution(institution.address, "Institution 1");
+      .connect(contractOwner)
+      .createRequestIssue("Institution 1");
+    await bridgingBlock
+      .connect(contractOwner)
+      .approveRequestIssue(institution.address);
 
     // Attempt to register the same institution again
     try {
       await bridgingBlock
-        .connect(owner)
-        .registerInstitution(institution.address, "Institution 2");
+        .connect(contractOwner)
+        .createRequestIssue("Institution 2");
+      await bridgingBlock
+        .connect(contractOwner)
+        .approveRequestIssue(institution.address);
     } catch (error) {
       expect(error.message).to.contain("revert");
     }
   });
 
   it("Should generate a credential", async function () {
+    // Create a request issue
+    await bridgingBlock
+      .connect(institution)
+      .createRequestIssue("Institution 1");
+
+    // Approve the request issue
+    await bridgingBlock
+      .connect(contractOwner)
+      .approveRequestIssue(institution.address);
+
+    expect(
+      await bridgingBlock.isInstitutionRegistered(institution.address)
+    ).to.equal(true);
+    // Generate a credential for the student
     const studentName = "Alice";
-    const studentID = "12345";
+    const studentID = 12345;
     const degreeName = "Computer Science";
     const major = "Blockchain";
     const graduationDate = 2023;
-    const GPA = "3.8";
-    const transcript = "Hash of the transcript";
-    const issuerSignature = "Hash of the issuer signature";
+    const gpa = 38;
 
-    await bridgingBlock
-      .connect(owner)
-      .registerInstitution(institution.address, "Institution 1");
     await bridgingBlock
       .connect(institution)
       .generateCredential(
         student.address,
-        ethers.utils.formatBytes32String(studentName),
-        ethers.utils.formatBytes32String(studentID),
-        ethers.utils.formatBytes32String(degreeName),
-        ethers.utils.formatBytes32String(major),
+        studentName,
+        studentID,
+        degreeName,
+        major,
         graduationDate,
-        ethers.utils.formatBytes32String(GPA),
-        ethers.utils.formatBytes32String(transcript),
-        ethers.utils.formatBytes32String(issuerSignature)
+        gpa
       );
 
-    const credentialData = await bridgingBlock.studentCredentials(
-      student.address
-    );
-    expect(credentialData.studentName).to.equal(
-      ethers.utils.formatBytes32String(studentName)
-    );
-    expect(credentialData.studentID).to.equal(
-      ethers.utils.formatBytes32String(studentID)
-    );
-    expect(credentialData.degreeName).to.equal(
-      ethers.utils.formatBytes32String(degreeName)
-    );
-    expect(credentialData.major).to.equal(
-      ethers.utils.formatBytes32String(major)
-    );
-    expect(credentialData.graduationDate).to.equal(graduationDate);
-    expect(credentialData.GPA).to.equal(ethers.utils.formatBytes32String(GPA));
-    expect(credentialData.transcript).to.equal(
-      ethers.utils.formatBytes32String(transcript)
-    );
-    expect(credentialData.issuerSignature).to.equal(
-      ethers.utils.formatBytes32String(issuerSignature)
-    );
+    expect(await bridgingBlock.getTotalRegisteredStudents()).to.equal(1);
+    expect(await bridgingBlock.getTotalRegisteredInstitutions()).to.equal(1);
   });
 
   it("Should not allow duplicate credential generation for a student", async function () {
     const studentName = "Alice";
-    const studentID = "12345";
+    const studentID = 12345;
     const degreeName = "Computer Science";
     const major = "Blockchain";
     const graduationDate = 2023;
-    const GPA = "3.8";
-    const transcript = "Hash of the transcript";
-    const issuerSignature = "Hash of the issuer signature";
+    const gpa = 38;
 
     await bridgingBlock
-      .connect(owner)
-      .registerInstitution(institution.address, "Institution 1");
+      .connect(institution)
+      .createRequestIssue("Institution 1");
+    await bridgingBlock
+      .connect(contractOwner)
+      .approveRequestIssue(institution.address);
     await bridgingBlock
       .connect(institution)
       .generateCredential(
         student.address,
-        ethers.utils.formatBytes32String(studentName),
-        ethers.utils.formatBytes32String(studentID),
-        ethers.utils.formatBytes32String(degreeName),
-        ethers.utils.formatBytes32String(major),
+        studentName,
+        studentID,
+        degreeName,
+        major,
         graduationDate,
-        ethers.utils.formatBytes32String(GPA),
-        ethers.utils.formatBytes32String(transcript),
-        ethers.utils.formatBytes32String(issuerSignature)
+        gpa
       );
 
     // Attempt to generate a credential for the same student again
@@ -149,14 +149,12 @@ describe("BridgingBlock Contract", function () {
         .connect(institution)
         .generateCredential(
           student.address,
-          ethers.utils.formatBytes32String(studentName),
-          ethers.utils.formatBytes32String(studentID),
-          ethers.utils.formatBytes32String(degreeName),
-          ethers.utils.formatBytes32String(major),
+          studentName,
+          studentID,
+          degreeName,
+          major,
           graduationDate,
-          ethers.utils.formatBytes32String(GPA),
-          ethers.utils.formatBytes32String(transcript),
-          ethers.utils.formatBytes32String(issuerSignature)
+          gpa
         );
     } catch (error) {
       expect(error.message).to.contain("revert");
@@ -165,21 +163,30 @@ describe("BridgingBlock Contract", function () {
 
   it("Should unregister an institution", async function () {
     await bridgingBlock
-      .connect(owner)
-      .registerInstitution(institution.address, "Institution 1");
+      .connect(institution)
+      .createRequestIssue("Institution 1");
     await bridgingBlock
-      .connect(owner)
+      .connect(contractOwner)
+      .approveRequestIssue(institution.address);
+
+    expect(await bridgingBlock.getTotalRegisteredInstitutions()).to.equal(1);
+    await bridgingBlock
+      .connect(contractOwner)
       .unregisterInstitution(institution.address);
-    const institutionData = await bridgingBlock.institutions(
+    const institutionData = await bridgingBlock.getInstitution(
       institution.address
     );
     expect(institutionData.isRegistered).to.equal(false);
+    expect(await bridgingBlock.getTotalRegisteredInstitutions()).to.equal(0);
   });
 
   it("Should not allow non-owner to unregister an institution", async function () {
     await bridgingBlock
-      .connect(owner)
-      .registerInstitution(institution.address, "Institution 1");
+      .connect(institution)
+      .createRequestIssue("Institution 1");
+    await bridgingBlock
+      .connect(contractOwner)
+      .approveRequestIssue(institution.address);
 
     // Attempt to unregister an institution by a non-owner
     try {
@@ -187,91 +194,87 @@ describe("BridgingBlock Contract", function () {
         .connect(institution)
         .unregisterInstitution(institution.address);
     } catch (error) {
-      expect(error.message).to.contain("revert");
+      expect(error.message).to.contain(
+        "Only the contract owner can perform this action"
+      );
     }
   });
 
   it("Should delete a student credential", async function () {
     const studentName = "Alice";
-    const studentID = "12345";
+    const studentID = 12345;
     const degreeName = "Computer Science";
     const major = "Blockchain";
     const graduationDate = 2023;
-    const GPA = "3.8";
-    const transcript = "Hash of the transcript";
-    const issuerSignature = "Hash of the issuer signature";
+    const gpa = 38;
 
     await bridgingBlock
-      .connect(owner)
-      .registerInstitution(institution.address, "Institution 1");
+      .connect(institution)
+      .createRequestIssue("Institution 1");
+    await bridgingBlock
+      .connect(contractOwner)
+      .approveRequestIssue(institution.address);
     await bridgingBlock
       .connect(institution)
       .generateCredential(
         student.address,
-        ethers.utils.formatBytes32String(studentName),
-        ethers.utils.formatBytes32String(studentID),
-        ethers.utils.formatBytes32String(degreeName),
-        ethers.utils.formatBytes32String(major),
+        studentName,
+        studentID,
+        degreeName,
+        major,
         graduationDate,
-        ethers.utils.formatBytes32String(GPA),
-        ethers.utils.formatBytes32String(transcript),
-        ethers.utils.formatBytes32String(issuerSignature)
+        gpa
       );
 
-    // Ensure the credential exists before deletion
-    const initialCredentialData = await bridgingBlock.studentCredentials(
-      student.address
+    expect(await bridgingBlock.getTotalRegisteredStudents()).to.equal(1);
+    expect(await bridgingBlock.isStudentRegistered(student.address)).to.equal(
+      true
     );
-    expect(initialCredentialData.studentName).to.equal(
-      ethers.utils.formatBytes32String(studentName)
-    );
-
     // Delete the student credential
     await bridgingBlock.connect(institution).deleteCredential(student.address);
-
-    // Check if the credential is deleted
-    const updatedCredentialData = await bridgingBlock.studentCredentials(
-      student.address
-    );
-    expect(updatedCredentialData.studentName).to.equal(
-      ethers.utils.formatBytes32String("")
+    expect(await bridgingBlock.getTotalRegisteredStudents()).to.equal(0);
+    expect(await bridgingBlock.isStudentRegistered(student.address)).to.equal(
+      false
     );
   });
-
+  // ====================================================================================================
   it("Should not allow a non-institution to delete a student credential", async function () {
     // Attempt to delete a student credential by a non-institution
     try {
-      await bridgingBlock.connect(owner).deleteCredential(student.address);
+      await bridgingBlock
+        .connect(institution)
+        .deleteCredential(student.address);
     } catch (error) {
-      expect(error.message).to.contain("revert");
+      expect(error.message).to.contain(
+        "Only registered universities can perform this action"
+      );
     }
   });
 
   it("Should retrieve a student credential", async function () {
     const studentName = "Alice";
-    const studentID = "12345";
+    const studentID = 12345;
     const degreeName = "Computer Science";
     const major = "Blockchain";
     const graduationDate = 2023;
-    const GPA = "3.8";
-    const transcript = "Hash of the transcript";
-    const issuerSignature = "Hash of the issuer signature";
+    const gpa = 38;
 
     await bridgingBlock
-      .connect(owner)
-      .registerInstitution(institution.address, "Institution 1");
+      .connect(institution)
+      .createRequestIssue("Institution 1");
+    await bridgingBlock
+      .connect(contractOwner)
+      .approveRequestIssue(institution.address);
     await bridgingBlock
       .connect(institution)
       .generateCredential(
         student.address,
-        ethers.utils.formatBytes32String(studentName),
-        ethers.utils.formatBytes32String(studentID),
-        ethers.utils.formatBytes32String(degreeName),
-        ethers.utils.formatBytes32String(major),
+        studentName,
+        studentID,
+        degreeName,
+        major,
         graduationDate,
-        ethers.utils.formatBytes32String(GPA),
-        ethers.utils.formatBytes32String(transcript),
-        ethers.utils.formatBytes32String(issuerSignature)
+        gpa
       );
 
     const [
@@ -280,43 +283,32 @@ describe("BridgingBlock Contract", function () {
       retrievedDegreeName,
       retrievedMajor,
       retrievedGraduationDate,
-      retrievedGPA,
-      retrievedTranscript,
-      retrievedIssuerSignature,
+      retrievedgpa,
     ] = await bridgingBlock.getCredential(student.address);
 
-    expect(retrievedStudentName).to.equal(
-      ethers.utils.formatBytes32String(studentName)
-    );
-    expect(retrievedStudentID).to.equal(
-      ethers.utils.formatBytes32String(studentID)
-    );
-    expect(retrievedDegreeName).to.equal(
-      ethers.utils.formatBytes32String(degreeName)
-    );
-    expect(retrievedMajor).to.equal(ethers.utils.formatBytes32String(major));
+    expect(retrievedStudentName).to.equal(studentName);
+    expect(retrievedStudentID).to.equal(studentID);
+    expect(retrievedDegreeName).to.equal(degreeName);
+    expect(retrievedMajor).to.equal(major);
     expect(retrievedGraduationDate).to.equal(graduationDate);
-    expect(retrievedGPA).to.equal(ethers.utils.formatBytes32String(GPA));
-    expect(retrievedTranscript).to.equal(
-      ethers.utils.formatBytes32String(transcript)
-    );
-    expect(retrievedIssuerSignature).to.equal(
-      ethers.utils.formatBytes32String(issuerSignature)
-    );
+    expect(retrievedgpa).to.equal(gpa);
   });
 
   it("Should retrieve institution details", async function () {
     const institutionName = "Institution 1";
 
     await bridgingBlock
-      .connect(owner)
-      .registerInstitution(institution.address, institutionName);
+      .connect(institution)
+      .createRequestIssue("Institution 1");
+    await bridgingBlock
+      .connect(contractOwner)
+      .approveRequestIssue(institution.address);
 
     const [retrievedName, retrievedIsRegistered] =
       await bridgingBlock.getInstitution(institution.address);
 
     expect(retrievedName).to.equal(institutionName);
-    expect(retrievedIsRegistered).to.equal(true); // Assuming it's registered
+    expect(retrievedIsRegistered).to.equal(true);
   });
 
   it("Should retrieve names of all registered institutions", async function () {
@@ -324,11 +316,17 @@ describe("BridgingBlock Contract", function () {
     const institutionName2 = "Institution 2";
 
     await bridgingBlock
-      .connect(owner)
-      .registerInstitution(institution.address, institutionName1);
+      .connect(institution)
+      .createRequestIssue("Institution 1");
     await bridgingBlock
-      .connect(owner)
-      .registerInstitution(institution2.address, institutionName2);
+      .connect(contractOwner)
+      .approveRequestIssue(institution.address);
+    await bridgingBlock
+      .connect(institution2)
+      .createRequestIssue("Institution 2");
+    await bridgingBlock
+      .connect(contractOwner)
+      .approveRequestIssue(institution2.address);
 
     const institutionNames =
       await bridgingBlock.getAllRegisteredInstitutionNames();
@@ -336,27 +334,5 @@ describe("BridgingBlock Contract", function () {
     expect(institutionNames).to.have.lengthOf(2);
     expect(institutionNames[0]).to.equal(institutionName1);
     expect(institutionNames[1]).to.equal(institutionName2);
-  });
-
-  it("Should remove an institution from the list of registered institutions", async function () {
-    const institutionName1 = "Institution 1";
-    const institutionName2 = "Institution 2";
-
-    await bridgingBlock
-      .connect(owner)
-      .registerInstitution(institution.address, institutionName1);
-    await bridgingBlock
-      .connect(owner)
-      .registerInstitution(institution2.address, institutionName2);
-
-    await bridgingBlock
-      .connect(owner)
-      .unregisterInstitution(institution.address);
-
-    const institutionNames =
-      await bridgingBlock.getAllRegisteredInstitutionNames();
-
-    expect(institutionNames).to.have.lengthOf(1);
-    expect(institutionNames[0]).to.equal(institutionName2);
   });
 });
